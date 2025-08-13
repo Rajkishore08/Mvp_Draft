@@ -80,7 +80,19 @@ contract ERC6551Account is IERC165, IERC1271 {
     address public tokenContract;
     uint256 public tokenId;
     
+    // Transaction logging for asset tracking
+    struct TransactionRecord {
+        uint256 timestamp;
+        string action;
+        address from;
+        address to;
+        string details;
+    }
+    
+    TransactionRecord[] public transactionHistory;
+    
     event TransactionExecuted(address indexed target, uint256 value, bytes data);
+    event TransactionLogged(uint256 indexed timestamp, string action, address indexed from, address indexed to, string details);
     
     modifier onlyOwner() {
         require(_isValidSigner(msg.sender), "Not token owner");
@@ -140,6 +152,34 @@ contract ERC6551Account is IERC165, IERC1271 {
         }
         
         return results;
+    }
+    
+    // Log custom transactions for asset tracking
+    function logTransaction(string calldata action, address to, string calldata details) external onlyOwner {
+        transactionHistory.push(TransactionRecord({
+            timestamp: block.timestamp,
+            action: action,
+            from: msg.sender,
+            to: to,
+            details: details
+        }));
+        emit TransactionLogged(block.timestamp, action, msg.sender, to, details);
+    }
+    
+    // Get transaction history
+    function getTransactionHistory() external view returns (TransactionRecord[] memory) {
+        return transactionHistory;
+    }
+    
+    // Get specific transaction by index
+    function getTransaction(uint256 index) external view returns (TransactionRecord memory) {
+        require(index < transactionHistory.length, "Transaction index out of bounds");
+        return transactionHistory[index];
+    }
+    
+    // Get transaction count
+    function getTransactionCount() external view returns (uint256) {
+        return transactionHistory.length;
     }
     
     // Get token info
