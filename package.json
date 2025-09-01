@@ -16,7 +16,11 @@
   "messageboard:send": "node scripts/messageboard-client.js",
   "push:local": "hardhat run scripts/push-local.js --network localhost",
   "qs:cli": "node scripts/quicksilver-bot.js",
-  "qs:web": "node scripts/quicksilver-server.js"
+  "qs:web": "node scripts/quicksilver-server.js",
+  "deploy:6551": "hardhat run scripts/deploy-6551.js --network localhost",
+  "mint:device": "hardhat run scripts/mint-device.js --network localhost",
+  "simulate:6551": "node scripts/simulate-through-6551.js",
+  "register:device": "hardhat run scripts/register-device.js --network localhost"
   },
   "keywords": [],
   "author": "",

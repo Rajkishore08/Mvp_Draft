@@ -54,6 +54,18 @@ Note: `.env` is ignored by git. For localhost, you typically don’t need a priv
 - ERC‑6551 demo artifacts from early drafts were removed from scripts; focus here is the IoT + QuickSilver MVP. An ERC‑6551 device-ownership layer can be added later.
 - If `npm run api:iotex` or `npm run qs:web` fail, validate `package.json` and `.env`, and ensure the IoTData address is set when required.
 
+## ERC‑6551 device NFTs (optional extension)
+Add device ownership with token-bound accounts, then route writes via the account:
+
+1) Deploy ERC‑6551 + MyNFT (localhost)
+	- `npm run deploy:6551`
+2) Mint a device NFT (records its token-bound account)
+	- `npm run mint:device`
+3) Send readings through the token-bound account
+	- `npm run simulate:6551`
+4) Read as usual via API or `read-iot`
+	- The IoTData contract stores the same payloads; the difference is provenance via the TBA.
+
 ## Pushing this MVP to a new GitHub repo
 1) Commit the draft (already handled in this branch)
 2) Create an empty GitHub repo (no README/license)
