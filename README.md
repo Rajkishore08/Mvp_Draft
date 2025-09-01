@@ -43,6 +43,8 @@ Note: `.env` is ignored by git. For localhost, you typically don’t need a priv
 1) Set `.env`:
 	- `IOTEX_RPC=https://babel-api.testnet.iotex.io`
 	- `IOTEX_PRIVATE_KEY=<funded testnet key>`
+	- `IOTEX_IOTDATA_ADDRESS= <# Deployed IoTData contract address on IoTeX testnet>`
+
 2) Deploy
 	- `npm run deploy:iotex`
 	- Put the deployed address into `IOTEX_IOTDATA_ADDRESS`
