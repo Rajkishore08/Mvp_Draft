@@ -1,6 +1,8 @@
 // Push mock IoT readings to IoTeX testnet using ethers over EVM RPC (no grpc)
 require("dotenv").config();
 const { ethers } = require("ethers");
+const fs = require("fs");
+const path = require("path");
 
 const abi = [
   {
@@ -19,21 +21,51 @@ const abi = [
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function main() {
-  const rpc = process.env.IOTEX_RPC || "https://babel-api.testnet.iotex.io";
-  const pk = process.env.IOTEX_PRIVATE_KEY;
-  const contractAddr = process.env.IOTEX_IOTDATA_ADDRESS; // set after deploy
-  if (!pk || !contractAddr) {
-    console.error("Missing IOTEX_PRIVATE_KEY or IOTEX_IOTDATA_ADDRESS in .env");
+  let rpc = process.env.IOTEX_RPC || "https://babel-api.testnet.iotex.io";
+  let pk = process.env.IOTEX_PRIVATE_KEY;
+  let contractAddr = process.env.IOTEX_IOTDATA_ADDRESS; // set after deploy
+  // Local fallback for convenience
+  if (!contractAddr) {
+    try {
+      const p = path.join(__dirname, "..", "artifacts-addresses", "iotdata-localhost.json");
+      if (fs.existsSync(p)) {
+        const j = JSON.parse(fs.readFileSync(p, "utf8"));
+        contractAddr = j.address || j.iotData || j.IoTData || j.contract;
+        rpc = process.env.IOTEX_RPC || "http://127.0.0.1:8545";
+        console.log(`[SIM] Using local IoTData at ${contractAddr} with RPC ${rpc}`);
+      }
+    } catch (_) {}
+  }
+  if (!contractAddr) {
+    console.error("IOTEX_IOTDATA_ADDRESS not set and no local fallback found.");
     process.exit(1);
   }
 
   const provider = new ethers.JsonRpcProvider(rpc);
-  const wallet = new ethers.Wallet(pk, provider);
-  const contract = new ethers.Contract(contractAddr, abi, wallet);
+  let signer;
+  if (pk) {
+    signer = new ethers.Wallet(pk, provider);
+  } else if (/127\.0\.0\.1|localhost/.test(rpc)) {
+    // Impersonate first local account to make it easy
+    const accounts = await provider.send("eth_accounts", []);
+    const acct = accounts[0];
+    await provider.send("hardhat_impersonateAccount", [acct]);
+    signer = await provider.getSigner(acct);
+    console.log(`[SIM] Impersonating ${acct} on localhost`);
+  } else {
+    console.error("No signer available. Set IOTEX_PRIVATE_KEY in .env.");
+    process.exit(1);
+  }
+  const contract = new ethers.Contract(contractAddr, abi, signer);
   const feeData = await provider.getFeeData();
 
-  const devices = ["sensor-1", "sensor-2"]; // demo devices
-  for (let i = 0; i < 5; i++) {
+  // Sensors and iterations can be customized via env
+  const SENSORS = (process.env.SENSORS || "sensor-1,sensor-2,sensor-3,sensor-4,sensor-5").split(/[,\s]+/).filter(Boolean);
+  const ITER = Number(process.env.ITERATIONS || 5);
+  const INTERVAL = Number(process.env.INTERVAL_MS || 1200);
+
+  const devices = SENSORS;
+  for (let i = 0; i < ITER; i++) {
     for (const d of devices) {
       const reading = JSON.stringify({ temp: 20 + Math.random() * 10, humidity: 40 + Math.random() * 20 });
       const ts = Math.floor(Date.now() / 1000);
@@ -48,7 +80,7 @@ async function main() {
       } catch (err) {
         console.error("send error", err.message || err);
       }
-      await sleep(2000);
+      await sleep(INTERVAL);
     }
   }
 

@@ -28,6 +28,9 @@ MVP draft that streams mock IoT sensor data to an on-chain contract and makes it
 	- `npm run push:local`
 6) Stream mock readings
 	- `npm run simulate:iotex`
+	- To send more sensors/readings locally:
+	  - PowerShell example:
+	    - `$env:SENSORS='sensor-1,sensor-2,sensor-3,sensor-4,sensor-5'; $env:ITERATIONS=8; $env:INTERVAL_MS=800; npm run simulate:iotex`
 7) Read back
 	- `npm run read:iotex -- sensor-1 5`
 8) API
@@ -63,8 +66,26 @@ Add device ownership with token-bound accounts, then route writes via the accoun
 	- `npm run mint:device`
 3) Send readings through the token-bound account
 	- `npm run simulate:6551`
-4) Read as usual via API or `read-iot`
+	- For more devices/readings in the plain IoTData path, use the SENSORS/ITERATIONS/INTERVAL_MS envs with simulate:iotex as above.
+4) Read as usual via API or `read-device`
+	- `node scripts/read-device.js device-0 5`
 	- The IoTData contract stores the same payloads; the difference is provenance via the TBA.
+
+## QuickSilver testing (with presets)
+1) Start the IoT API (automatic localhost fallback if .env missing)
+	- `npm run api:iotex`
+2) Start the QuickSilver web server
+	- `npm run qs:web` → Open http://localhost:8799
+3) Use the “Try a preset” dropdown
+	- Latest from device-0
+	- Last 5 from device-0
+	- Latest from sensor-1
+	- Last 3 from sensor-1
+4) Or type your own prompt
+	- Examples:
+		- latest from device device-0
+		- last 5 readings from device device-0
+		- latest from device sensor-1
 
 ## Pushing this MVP to a new GitHub repo
 1) Commit the draft (already handled in this branch)
@@ -73,3 +94,90 @@ Add device ownership with token-bound accounts, then route writes via the accoun
 	- `git remote remove origin` (optional if you want to replace the old one)
 	- `git remote add origin <your-new-repo-url.git>`
 	- `git push -u origin main`
+
+## Runbook (Windows PowerShell)
+
+Prereqs
+- Node.js 18+ and npm
+- Git (optional)
+
+1) Install and compile
+```
+npm install
+npx hardhat compile
+```
+
+2) Start a local blockchain (new terminal)
+```
+npx hardhat node
+```
+
+3) Deploy IoTData (plain sensor flow)
+```
+npm run deploy:iot
+```
+
+4) Stream mock sensor readings (sensor-1..N)
+- Default (sensor-1..5; 5 iterations):
+```
+npm run simulate:iotex
+```
+- More sensors/readings (example):
+```
+$env:SENSORS='sensor-1,sensor-2,sensor-3,sensor-4,sensor-5'
+$env:ITERATIONS=8
+$env:INTERVAL_MS=800
+npm run simulate:iotex
+```
+
+5) Start the IoT API (auto-falls back to localhost)
+```
+npm run api:iotex
+```
+- API: http://localhost:8787
+- Examples:
+	- http://localhost:8787/latest?deviceId=sensor-1
+	- http://localhost:8787/last?deviceId=sensor-1&n=5
+
+6) Start QuickSilver web (with preset prompts)
+```
+npm run qs:web
+```
+Open http://localhost:8799
+- Use the “Try a preset” dropdown or type your own prompt
+- Examples:
+	- latest from device device-0
+	- last 3 readings from device sensor-1
+
+7) 6551 device NFT flow (optional, for TBA provenance)
+- Deploy 6551 stack (Registry, Account impl, MyNFT):
+```
+npm run deploy:6551
+```
+- Mint a device NFT (creates TBA):
+```
+npm run mint:device
+```
+- Register device binding in IoTData:
+```
+npm run register:device
+```
+- Send readings via TBA (auto-impersonates owner on localhost):
+```
+npm run simulate:6551
+```
+- Verify via CLI (shows binding, readings, TBA logs):
+```
+node scripts/read-device.js device-0 5
+```
+- In the web UI, TBA-written entries show “Verified by TBA”.
+
+8) Extra reads (plain sensors)
+```
+node scripts/read-iot.js
+```
+
+Troubleshooting
+- If QuickSilver shows “0 readings” for sensor-1, run simulate:iotex with SENSORS including sensor-1 (see step 4).
+- For simulate:6551 on localhost, owner is auto-impersonated. On testnets, set IOTEX_PRIVATE_KEY to the NFT owner’s key.
+- Ports: API 8787, QuickSilver 8799. Ensure they’re free.

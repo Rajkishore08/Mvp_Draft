@@ -6,6 +6,17 @@ const { ethers } = require("ethers");
 const abi = [
   {
     inputs: [ { internalType: "string", name: "deviceId", type: "string" } ],
+    name: "getDeviceBinding",
+    outputs: [
+      { internalType: "address", name: "nft", type: "address" },
+      { internalType: "uint256", name: "tokenId", type: "uint256" },
+      { internalType: "address", name: "account", type: "address" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [ { internalType: "string", name: "deviceId", type: "string" } ],
     name: "latestReading",
     outputs: [
       { internalType: "bool", name: "exists", type: "bool" },
@@ -36,10 +47,24 @@ const abi = [
 const app = express();
 app.use(cors());
 
-const rpc = process.env.IOTEX_RPC || "https://babel-api.testnet.iotex.io";
-const addr = process.env.IOTEX_IOTDATA_ADDRESS;
+let rpc = process.env.IOTEX_RPC || "https://babel-api.testnet.iotex.io";
+let addr = process.env.IOTEX_IOTDATA_ADDRESS;
 if (!addr) {
-  console.error("IOTEX_IOTDATA_ADDRESS not set in .env");
+  // Try local fallback
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const p = path.join(__dirname, "..", "artifacts-addresses", "iotdata-localhost.json");
+    if (fs.existsSync(p)) {
+      const j = JSON.parse(fs.readFileSync(p, "utf8"));
+      addr = j.address || j.iotData || j.IoTData || j.contract;
+      rpc = process.env.IOTEX_RPC || "http://127.0.0.1:8545";
+      console.log(`[API] Using local IoTData at ${addr} with RPC ${rpc}`);
+    }
+  } catch (_) {}
+}
+if (!addr) {
+  console.error("IOTEX_IOTDATA_ADDRESS not set and no local fallback found. Set it in .env or deploy locally.");
 }
 const provider = new ethers.JsonRpcProvider(rpc);
 const contract = addr ? new ethers.Contract(addr, abi, provider) : null;
@@ -60,10 +85,16 @@ app.get("/last", async (req, res) => {
     const deviceId = req.query.deviceId || "sensor-1";
     const n = Number(req.query.n || 5);
     if (!contract) throw new Error("Contract not configured");
-    const r = await contract.lastNReadings(deviceId, n);
+    const [binding, r] = await Promise.all([
+      contract.getDeviceBinding(deviceId),
+      contract.lastNReadings(deviceId, n)
+    ]);
   const out = [];
     for (let i = 0; i < r[0].length; i++) {
-      out.push({ ts: Number(r[0][i]), reading: r[1][i], sender: r[2][i] });
+      const sender = r[2][i];
+      const account = binding[2];
+      const verifiedByTBA = account && account !== '0x0000000000000000000000000000000000000000' && sender.toLowerCase() === account.toLowerCase();
+      out.push({ ts: Number(r[0][i]), reading: r[1][i], sender, verifiedByTBA });
     }
     // Compute summary stats (temp & humidity) when reading is JSON
     let temps = [], hums = [];
@@ -77,7 +108,8 @@ app.get("/last", async (req, res) => {
     const sum = arr => arr.reduce((a,b)=>a+b,0);
     const mm = arr => arr.length ? { min: Math.min(...arr), max: Math.max(...arr), avg: sum(arr)/arr.length } : null;
     const summary = { temp: mm(temps), humidity: mm(hums) };
-    res.json({ deviceId, n, count: out.length, readings: out, summary });
+  const bind = { nft: binding[0], tokenId: Number(binding[1]), account: binding[2] };
+  res.json({ deviceId, n, count: out.length, readings: out, summary, binding: bind });
   } catch (e) { res.status(500).json({ error: String(e.message || e) }); }
 });
 

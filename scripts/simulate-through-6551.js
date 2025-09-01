@@ -59,20 +59,39 @@ async function main(){
 
   const provider = new ethers.JsonRpcProvider(rpc);
   const wallet = pk ? new ethers.Wallet(pk, provider) : (await provider.getSigner?.(0)) || null;
-  const signer = wallet; // ethers v6 in Node: provider.getSigner not available; use wallet when pk provided
+  let signer = wallet; // may be replaced by impersonated owner on localhost
   if (!signer) throw new Error("No signer. Set IOTEX_PRIVATE_KEY or run via Hardhat with accounts.");
 
   // Find latest minted token’s account
   const MyNFT = new ethers.Contract(myNFT, [
     "event NFTMinted(address indexed to, uint256 indexed tokenId, address account)",
     "function getAccount(uint256) view returns (address)",
-    "function nextTokenId() view returns (uint256)"
+    "function nextTokenId() view returns (uint256)",
+    "function ownerOf(uint256) view returns (address)"
   ], signer);
   const nextId = await MyNFT.nextTokenId();
   if (nextId === 0n) throw new Error("No devices minted yet. Run mint-device first.");
   const tokenId = (nextId - 1n);
   const accountAddr = await MyNFT.getAccount(tokenId);
   if (!accountAddr || accountAddr === ethers.ZeroAddress) throw new Error("No token-bound account found.");
+  const currentOwner = await MyNFT.ownerOf(tokenId);
+  const signerAddr = await signer.getAddress();
+  if (signerAddr.toLowerCase() !== currentOwner.toLowerCase()) {
+    const isLocal = /127\.0\.0\.1|localhost/.test(rpc);
+    if (isLocal) {
+      // Try Hardhat impersonation so we can proceed without the owner's PK
+      try {
+        await provider.send("hardhat_impersonateAccount", [currentOwner]);
+        const ownerSigner = await provider.getSigner(currentOwner);
+        signer = ownerSigner;
+        console.log(`Impersonating NFT owner ${currentOwner} on localhost`);
+      } catch (e) {
+        throw new Error(`Signer is not NFT owner and impersonation failed. signer=${signerAddr} owner=${currentOwner}. Set IOTEX_PRIVATE_KEY to the NFT owner's key or transfer the NFT. Inner: ${e.message || e}`);
+      }
+    } else {
+      throw new Error(`Signer is not NFT owner. signer=${signerAddr} owner=${currentOwner}. Use the NFT owner's private key in IOTEX_PRIVATE_KEY or transfer the NFT to this signer, then retry.`);
+    }
+  }
 
   const account = new ethers.Contract(accountAddr, ACCOUNT_ABI, signer);
   const iotIface = new ethers.Interface(IOT_ABI);

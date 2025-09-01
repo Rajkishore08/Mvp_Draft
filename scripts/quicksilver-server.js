@@ -56,18 +56,39 @@ app.get("/", (_req, res) => {
     #stats{border:1px solid #eee;padding:8px;margin-top:8px}
     .item{border-bottom:1px dashed #eee;padding:4px 0}
     .muted{color:#777}
+    #presets{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    select,button,input{font:14px sans-serif}
   </style>
   </head><body>
   <h3>QuickSilver Prototype</h3>
   <div id="out"></div>
+  <div id="presets">
+    <label for="preset">Try a preset:</label>
+    <select id="preset">
+      <option value="latest from device device-0">Latest from device-0</option>
+      <option value="last 5 readings from device device-0">Last 5 from device-0</option>
+      <option value="latest from device sensor-1">Latest from sensor-1</option>
+      <option value="last 3 readings from device sensor-1">Last 3 from sensor-1</option>
+    </select>
+    <button onclick="usePreset()">Use</button>
+    <button onclick="sendPreset()">Send</button>
+  </div>
   <div id="panel">
     <input id="msg" placeholder="Ask: latest temperature or last 5 readings from device sensor-1" style="flex:1"/>
     <button onclick="send()">Send</button>
   </div>
   <div id="stats" class="muted">Summary will appear here when asking for last N readings.</div>
   <script>
-  async function send(){
-    const msg = document.getElementById('msg').value;
+  function usePreset(){
+    const msg = document.getElementById('preset').value;
+    document.getElementById('msg').value = msg;
+  }
+  async function sendPreset(){
+    const msg = document.getElementById('preset').value;
+    await send(msg);
+  }
+  async function send(text){
+    const msg = text ?? document.getElementById('msg').value;
     const r = await fetch('/ask', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ msg })});
     const data = await r.json();
     const out = document.getElementById('out');
@@ -78,7 +99,8 @@ app.get("/", (_req, res) => {
     const stats = document.getElementById('stats');
     if (data.data && Array.isArray(data.data.readings)) {
       const list = data.data.readings.map(r => {
-        return '<div class="item"><span class="muted">'+ new Date(r.ts*1000).toLocaleString() +'</span> — '+ r.reading +'</div>'
+        const badge = r.verifiedByTBA ? ' <span style="background:#e6ffed;color:#137333;border:1px solid #b7e0c2;border-radius:4px;padding:1px 4px;font-size:11px">Verified by TBA</span>' : '';
+        return '<div class="item"><span class="muted">'+ new Date(r.ts*1000).toLocaleString() +'</span> — '+ r.reading + badge +'</div>'
       }).join('');
       let s = ''; const sum = data.data.summary;
       if (sum) {
