@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -32,5 +33,13 @@ module.exports = {
     cache: "./cache",
     artifacts: "./artifacts"
   },
+  networks: {
+    // IoTeX EVM-compatible testnet (chainId 4690)
+    iotex_testnet: {
+      url: process.env.IOTEX_RPC || "https://babel-api.testnet.iotex.io",
+      chainId: 4690,
+      accounts: process.env.IOTEX_PRIVATE_KEY ? [process.env.IOTEX_PRIVATE_KEY] : []
+    }
+  }
 // removed extra closing brace
 };

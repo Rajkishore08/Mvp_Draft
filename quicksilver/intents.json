@@ -1,0 +1,40 @@
+{
+  "intents": [
+    {
+      "name": "get_latest_temperature",
+      "utterances": [
+        "what's the latest temperature",
+        "latest reading",
+        "current temperature on {deviceId}",
+        "latest from {deviceId}"
+      ],
+      "slots": [ { "name": "deviceId", "type": "string", "optional": true } ],
+      "action": {
+        "type": "http",
+        "method": "GET",
+        "url": "http://localhost:8787/latest",
+        "query": { "deviceId": "{{deviceId|sensor-1}}" }
+      },
+      "responseTemplate": "Device {{deviceId|sensor-1}} => exists={{exists}}, ts={{timestamp}}, reading={{reading}}"
+    },
+    {
+      "name": "get_last_n_readings",
+      "utterances": [
+        "show last {n} readings from {deviceId}",
+        "last {n} readings",
+        "history for {deviceId}"
+      ],
+      "slots": [
+        { "name": "deviceId", "type": "string", "optional": true },
+        { "name": "n", "type": "number", "optional": true }
+      ],
+      "action": {
+        "type": "http",
+        "method": "GET",
+        "url": "http://localhost:8787/last",
+        "query": { "deviceId": "{{deviceId|sensor-1}}", "n": "{{n|10}}" }
+      },
+      "responseTemplate": "Device {{deviceId|sensor-1}} => returned {{count}} readings"
+    }
+  ]
+}
